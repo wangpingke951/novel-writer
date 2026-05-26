@@ -1,0 +1,4 @@
+#!/bin/bash
+# 自动写小说 Agent 启动脚本
+cd "$(dirname "$0")"
+python main.py "$@"

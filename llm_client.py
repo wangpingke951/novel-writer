@@ -11,13 +11,14 @@ class LLMClient:
         model = kwargs.get("model", Config.MODEL)
         temperature = kwargs.get("temperature", Config.TEMPERATURE)
         max_tokens = kwargs.get("max_tokens", Config.MAX_TOKENS)
+        thinking = kwargs.get("thinking", Config.THINKING_LEVEL)
 
         last_error = None
         for attempt in range(Config.MAX_RETRIES):
             try:
                 extra_body = {}
-                if Config.THINKING_LEVEL:
-                    extra_body["thinking"] = {"type": Config.THINKING_LEVEL}
+                if thinking:
+                    extra_body["thinking"] = {"type": thinking}
 
                 response = self._client.chat.completions.create(
                     model=model,
@@ -33,3 +34,29 @@ class LLMClient:
                     time.sleep(Config.RETRY_DELAY * (attempt + 1))
 
         raise RuntimeError(f"LLM call failed after {Config.MAX_RETRIES} retries: {last_error}")
+
+    def chat_completion_stream(self, messages: list[dict], on_chunk=None, **kwargs):
+        model = kwargs.get("model", Config.MODEL)
+        temperature = kwargs.get("temperature", Config.TEMPERATURE)
+        max_tokens = kwargs.get("max_tokens", Config.MAX_TOKENS)
+        thinking = kwargs.get("thinking", Config.THINKING_LEVEL)
+
+        extra_body = {}
+        if thinking:
+            extra_body["thinking"] = {"type": thinking}
+
+        stream = self._client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True,
+            extra_body=extra_body if extra_body else None,
+        )
+
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                content = chunk.choices[0].delta.content
+                if on_chunk:
+                    on_chunk(content)
+                yield content
